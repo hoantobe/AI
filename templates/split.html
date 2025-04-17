@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Tách Phụ Đề{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h3 class="mb-4 text-primary"><i class="fas fa-cut"></i> Tách Phụ Đề</h3>
+        <p class="text-muted">Tách phụ đề dài thành các dòng ngắn hơn, giữ nguyên ý nghĩa và ngữ cảnh.</p>
+                
+        <form id="splitForm">
+            <div class="mb-3">
+                <label class="form-label">Chọn file SRT:</label>
+                <input type="file" class="form-control" name="file" accept=".srt" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Độ dài tối đa mỗi dòng:</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" name="max_length" 
+                           value="45" min="20" max="100">
+                    <span class="input-group-text">ký tự</span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Thời gian tối thiểu mỗi phụ đề:</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" name="min_duration" 
+                           value="1.0" min="0.5" max="5.0" step="0.1">
+                    <span class="input-group-text">giây</span>
+                </div>
+            </div>
+
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" name="smart_split" id="smartSplit">
+                <label class="form-check-label" for="smartSplit">
+                    Tách thông minh theo câu/ngữ nghĩa
+                </label>
+            </div>
+
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" name="use_ai" id="useAI" checked>
+                <label class="form-check-label" for="useAI">
+                    Sử dụng AI để tách phụ đề thông minh
+                </label>
+                <small class="form-text text-muted">
+                    AI sẽ phân tích ngữ cảnh để tách phụ đề hợp lý hơn.
+                </small>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+                <i class="fas fa-play"></i> Bắt đầu tách
+            </button>
+        </form>
+
+        <!-- Progress -->
+        <div class="progress mt-3 d-none">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                 role="progressbar">
+                <span class="progress-text">0%</span>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="alert mt-3 d-none"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        let isCheckingProgress = false;
+
+        $('#splitForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            $('.progress').removeClass('d-none');
+            $('#status').addClass('d-none');
+            $('#submitBtn').prop('disabled', true);
+
+            var formData = new FormData(this);
+
+            $.ajax({
+                url: '/split-subtitle',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.task_id) {
+                        checkProgress(response.task_id);
+                    } else {
+                        showMessage('danger', 'Không nhận được task ID');
+                        $('#submitBtn').prop('disabled', false);
+                    }
+                },
+                error: function(xhr) {
+                    showMessage('danger', xhr.responseJSON?.error || 'Lỗi không xác định');
+                    $('#submitBtn').prop('disabled', false);
+                }
+            });
+        });
+
+        function checkProgress(taskId) {
+            if (!taskId) {
+                showMessage('danger', 'Task ID không hợp lệ');
+                $('#submitBtn').prop('disabled', false);
+                return;
+            }
+
+            if (isCheckingProgress) return;
+            isCheckingProgress = true;
+
+            $.get(`/progress/${taskId}`, function(data) {
+                $('.progress').removeClass('d-none');
+                $('.progress-bar')
+                    .css('width', `${data.progress}%`)
+                    .find('.progress-text')
+                    .text(`${data.progress}%`);
+
+                let statusText = `Đang xử lý: ${data.current_sub || 0}/${data.total_subs || 0} phụ đề`;
+                $('#status').html(statusText).removeClass('d-none');
+
+                if (data.status === 'completed') {
+                    showMessage('success', 'Tách phụ đề hoàn thành!');
+                    window.location.href = `/download/${taskId}`;
+                    $('#submitBtn').prop('disabled', false);
+                } else if (data.status === 'failed') {
+                    showMessage('danger', `Lỗi: ${data.error}`);
+                    $('#submitBtn').prop('disabled', false);
+                } else {
+                    setTimeout(() => checkProgress(taskId), 500);
+                }
+            }).fail(function(xhr) {
+                if (xhr.status === 404) {
+                    showMessage('warning', 'Task không tồn tại hoặc đã hết hạn');
+                    $('#submitBtn').prop('disabled', false);
+                } else {
+                    showMessage('danger', 'Lỗi kết nối máy chủ');
+                    setTimeout(() => checkProgress(taskId), 1000);
+                }
+            }).always(function() {
+                isCheckingProgress = false;
+            });
+        }
+
+        function showMessage(type, message) {
+            const alertDiv = $('#status');
+            alertDiv
+                .removeClass('alert-success alert-danger alert-warning')
+                .addClass(`alert-${type}`)
+                .html(message)
+                .fadeIn();
+        }
+    });
+</script>
+{% endblock %}

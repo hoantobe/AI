@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Tóm Tắt Phụ Đề{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <h3 class="mb-4">Tóm Tắt Nội Dung Phụ Đề</h3>
+        
+        <form id="summarizeForm">
+            <div class="mb-3">
+                <label class="form-label">Chọn file phụ đề (.srt):</label>
+                <input type="file" class="form-control" name="file" accept=".srt" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Độ dài tóm tắt:</label>
+                <select class="form-select" name="length">
+                    <option value="short">Ngắn (2-3 câu)</option>
+                    <option value="medium" selected>Trung bình (4-6 câu)</option>
+                    <option value="long">Dài (7-10 câu)</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Phong cách:</label>
+                <select class="form-select" name="style">
+                    <option value="bullet">Điểm chính</option>
+                    <option value="paragraph" selected>Đoạn văn</option>
+                    <option value="timeline">Theo thời gian</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+                Bắt đầu tóm tắt
+            </button>
+        </form>
+
+        <!-- Progress -->
+        <div class="progress mt-3 d-none">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                 role="progressbar">
+                <span class="progress-text">0%</span>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="alert mt-3 d-none"></div>
+
+        <!-- Result -->
+        <div id="resultCard" class="card mt-3 d-none">
+            <div class="card-body">
+                <h5 class="card-title">Kết quả tóm tắt:</h5>
+                <div id="summaryResult" class="card-text"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+<style>
+    #summaryResult {
+        white-space: pre-line;
+        line-height: 1.5;
+        font-size: 16px;
+    }
+    
+    #summaryResult.bullet-style {
+        padding-left: 20px;
+    }
+    
+    #summaryResult.bullet-style li {
+        margin-bottom: 8px;
+    }
+    
+    #resultCard {
+        margin-top: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    #resultCard .card-title {
+        color: #2c3e50;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    </style>
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('#summarizeForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        $('.progress').removeClass('d-none');
+        $('#status').addClass('d-none');
+        $('#resultCard').addClass('d-none');
+        $('#submitBtn').prop('disabled', true);
+
+        var formData = new FormData(this);
+
+        $.ajax({
+            url: '/summarize-subtitle',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.task_id) {
+                    checkProgress(response.task_id);
+                } else {
+                    showMessage('danger', 'Không nhận được task ID');
+                    $('#submitBtn').prop('disabled', false);
+                }
+            },
+            error: function(xhr) {
+                showMessage('danger', xhr.responseJSON?.error || 'Lỗi không xác định');
+                $('#submitBtn').prop('disabled', false);
+            }
+        });
+    });
+
+    function checkProgress(taskId) {
+        $.get(`/progress/${taskId}`, function(data) {
+            $('.progress-bar')
+                .css('width', `${data.progress}%`)
+                .find('.progress-text')
+                .text(`${data.progress}%`);
+
+            $('#status')
+                .removeClass('d-none')
+                .html(`Đang xử lý: ${data.current_sub || 0}/${data.total_subs || 0} phụ đề`);
+
+            if (data.status === 'completed') {
+                showMessage('success', 'Tóm tắt hoàn thành!');
+                $('#submitBtn').prop('disabled', false);
+                
+                // Hiển thị kết quả tóm tắt
+                if (data.summary) {
+                    $('#summaryResult').html(data.summary.replace(/\n/g, '<br>'));
+                    $('#resultCard').removeClass('d-none');
+                }
+            } else if (data.status === 'failed') {
+                showMessage('danger', `Lỗi: ${data.error}`);
+                $('#submitBtn').prop('disabled', false);
+            } else {
+                setTimeout(() => checkProgress(taskId), 500);
+            }
+        }).fail(function(xhr) {
+            showMessage('danger', 'Lỗi kết nối máy chủ');
+            setTimeout(() => checkProgress(taskId), 1000);
+        });
+    }
+
+    function showMessage(type, message) {
+        const alertDiv = $('#status');
+        alertDiv
+            .removeClass('d-none alert-success alert-danger alert-warning')
+            .addClass(`alert-${type}`)
+            .html(message)
+            .show();
+    }
+});
+</script>
+{% endblock %}

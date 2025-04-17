@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Tạo Phụ Đề từ Văn Bản{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Tạo Phụ Đề từ Văn Bản</h1>
+    
+    <div class="card">
+        <div class="card-body">
+            <form id="textToSrtForm">
+                <div class="mb-3">
+                    <label class="form-label">Văn bản nguồn:</label>
+                    <textarea class="form-control" name="text" rows="10" 
+                              placeholder="Nhập văn bản cần chuyển thành phụ đề..." required></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Độ dài tối đa mỗi phụ đề:</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" name="max_length" 
+                               value="500" min="100" max="1000">
+                        <span class="input-group-text">ký tự</span>
+                    </div>
+                </div>
+
+                <!-- Thay đổi phần input thời gian -->
+                <div class="mb-3">
+                    <label class="form-label">Thời gian mỗi phụ đề:</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" name="duration" 
+                               value="30" min="5" max="60" step="1">
+                        <span class="input-group-text">giây</span>
+                    </div>
+                    <small class="form-text text-muted">
+                        Khuyến nghị: 30 giây cho mỗi phụ đề để dễ đọc và ghi nhớ
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    Tạo Phụ Đề
+                </button>
+            </form>
+
+            <!-- Progress -->
+            <div class="progress mt-3" style="display: none;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar">
+                    <span class="progress-text">0%</span>
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div id="status" class="alert mt-3" style="display: none;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('#textToSrtForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        $('.progress').show();
+        $('#status').hide();
+        $('#submitBtn').prop('disabled', true);
+
+        var formData = new FormData(this);
+
+        $.ajax({
+            url: '/text-to-srt/convert',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                checkProgress(response.task_id);
+            },
+            error: function(xhr) {
+                showMessage('danger', xhr.responseJSON?.error || 'Lỗi không xác định');
+                $('#submitBtn').prop('disabled', false);
+            }
+        });
+    });
+
+    function checkProgress(taskId) {
+        $.get(`/progress/${taskId}`, function(data) {
+            $('.progress-bar').css('width', `${data.progress}%`);
+            $('.progress-text').text(`${data.progress}%`);
+            
+            if (data.status === 'completed') {
+                showMessage('success', 'Tạo phụ đề hoàn thành!');
+                window.location.href = `/download/${taskId}`;
+                $('#submitBtn').prop('disabled', false);
+            } else if (data.status === 'failed') {
+                showMessage('danger', `Lỗi: ${data.error}`);
+                $('#submitBtn').prop('disabled', false);
+            } else {
+                setTimeout(() => checkProgress(taskId), 1000);
+            }
+        }).fail(function() {
+            showMessage('danger', 'Lỗi khi kiểm tra tiến độ');
+            $('#submitBtn').prop('disabled', false);
+        });
+    }
+
+    function showMessage(type, message) {
+        const alertDiv = $('#status');
+        alertDiv
+            .removeClass('alert-success alert-danger alert-warning')
+            .addClass(`alert-${type}`)
+            .html(message)
+            .show();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Trang Chủ{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h1 class="display-4 text-primary">Chào mừng đến với SubTools</h1>
+    <p class="lead">Công cụ xử lý phụ đề mạnh mẽ và dễ sử dụng.</p>
+    <a href="/translate" class="btn btn-primary btn-lg"><i class="fas fa-language"></i> Bắt đầu dịch phụ đề</a>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-language fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">Dịch Phụ Đề</h5>
+                <p class="card-text">Dịch phụ đề từ nhiều ngôn ngữ với phong cách tùy chỉnh.</p>
+                <a href="/translate" class="btn btn-outline-primary">Xem thêm</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-cut fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">Tách Phụ Đề</h5>
+                <p class="card-text">Tách phụ đề dài thành các dòng ngắn hơn, dễ đọc hơn.</p>
+                <a href="/split-subtitle" class="btn btn-outline-primary">Xem thêm</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-edit fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">Sửa Phụ Đề</h5>
+                <p class="card-text">Chỉnh sửa phụ đề: xóa icon, làm sạch văn bản.</p>
+                <a href="/edit-subtitle" class="btn btn-outline-primary">Xem thêm</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

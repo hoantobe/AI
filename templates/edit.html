@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Sửa Phụ Đề{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <h3 class="mb-4">Sửa Phụ Đề</h3>
+                
+        <form id="editForm">
+            <div class="mb-3">
+                <label class="form-label">Chọn file SRT:</label>
+                <input type="file" class="form-control" name="file" accept=".srt" required>
+            </div>
+
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="remove_parentheses" id="removeParentheses" checked>
+                    <label class="form-check-label" for="removeParentheses">
+                        Xóa nội dung trong ngoặc ()
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="check_chinese" id="checkChinese" checked>
+                    <label class="form-check-label" for="checkChinese">
+                        Kiểm tra chữ Trung Quốc
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="clean_punctuation" id="cleanPunctuation" checked>
+                    <label class="form-check-label" for="cleanPunctuation">
+                        Làm sạch dấu câu và emoji
+                    </label>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="use_ai" id="useAI" checked>
+                    <label class="form-check-label" for="useAI">
+                        Sử dụng AI để sửa phong cách
+                    </label>
+                </div>
+
+                <div id="styleOptions" class="mt-2">
+                    <label class="form-label">Phong cách:</label>
+                    <select class="form-select" name="style">
+                        <option value="standard">Chuẩn mực</option>
+                        <option value="formal">Trang trọng</option>
+                        <option value="casual">Thân mật</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+                Bắt đầu sửa
+            </button>
+        </form>
+
+        <!-- Progress -->
+        <div class="progress mt-3 hidden">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                 role="progressbar">
+                <span class="progress-text">0%</span>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="alert mt-3 hidden"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('#editForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        $('.progress').show();
+        $('#status').hide();
+        $('#submitBtn').prop('disabled', true);
+
+        var formData = new FormData(this);
+
+        $.ajax({
+            url: '/edit-subtitle',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.task_id) {
+                    checkProgress(response.task_id);
+                } else {
+                    showMessage('danger', 'Không nhận được task ID');
+                    $('#submitBtn').prop('disabled', false);
+                }
+            },
+            error: function(xhr) {
+                showMessage('danger', xhr.responseJSON?.error || 'Lỗi không xác định');
+                $('#submitBtn').prop('disabled', false);
+            }
+        });
+    });
+
+    function checkProgress(taskId) {
+        $.get(`/progress/${taskId}`, function(data) {
+            $('.progress-bar')
+                .css('width', `${data.progress}%`)
+                .find('.progress-text')
+                .text(`${data.progress}%`);
+
+            let statusText = `Đang xử lý: ${data.current_sub || 0}/${data.total_subs || 0} phụ đề`;
+            $('#status').html(statusText).show();
+
+            if (data.status === 'completed') {
+                showMessage('success', 'Sửa phụ đề hoàn thành!');
+                window.location.href = `/download/${taskId}`;
+                $('#submitBtn').prop('disabled', false);
+            } else if (data.status === 'failed') {
+                showMessage('danger', `Lỗi: ${data.error}`);
+                $('#submitBtn').prop('disabled', false);
+            } else {
+                setTimeout(() => checkProgress(taskId), 500);
+            }
+        }).fail(function(xhr) {
+            showMessage('danger', 'Lỗi kết nối máy chủ');
+            setTimeout(() => checkProgress(taskId), 1000);
+        });
+    }
+
+    function showMessage(type, message) {
+        const alertDiv = $('#status');
+        alertDiv
+            .removeClass('alert-success alert-danger alert-warning')
+            .addClass(`alert-${type}`)
+            .html(message)
+            .show();
+    }
+
+    // Toggle AI style options
+    $('#useAI').change(function() {
+        $('#styleOptions').toggle(this.checked);
+    });
+});
+</script>
+{% endblock %}

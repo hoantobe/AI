@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}Dịch Phụ Đề{% endblock %}
+
+{% block content %}
+<!-- Giữ nguyên nội dung hiện tại của index.html, chỉ bỏ phần head và body tags -->
+<div class="container">
+    <h1 class="mb-4">Dịch Phụ Đề SRT</h1>
+    
+    <div class="card">
+        <div class="card-body">
+            <form id="translateForm">
+               
+
+                <!-- Thêm vào sau phần file upload và trước language options -->
+                <div class="mb-3">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="inputType" id="fileInput" value="file" checked>
+                        <label class="form-check-label" for="fileInput">
+                            Dịch file SRT
+                        </label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="inputType" id="textInput" value="text">
+                        <label class="form-check-label" for="textInput">
+                            Dịch văn bản trực tiếp
+                        </label>
+                    </div>
+                </div>
+
+                <div id="fileInputSection" class="mb-3">
+                    <label class="form-label">Chọn file SRT:</label>
+                    <input type="file" class="form-control" name="file" accept=".srt">
+                </div>
+
+                <div id="textInputSection" class="mb-3" style="display: none;">
+                    <div class="row">
+                        <div class="col">
+                            <label class="form-label">Văn bản gốc:</label>
+                            <textarea class="form-control" name="sourceText" rows="5" placeholder="Nhập văn bản cần dịch..."></textarea>
+                        </div>
+                        <div class="col">
+                            <label class="form-label">Kết quả dịch:</label>
+                            <textarea class="form-control" id="translatedText" rows="5" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Language Options -->
+                <div class="mb-3">
+                    <label class="form-label">Ngôn ngữ nguồn:</label>
+                    <select class="form-select" name="source_lang">
+                        <option value="zh">Tiếng Trung</option>
+                        <option value="en">Tiếng Anh</option>
+                        <option value="ko">Tiếng Hàn</option>
+                        <option value="ja">Tiếng Nhật</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Ngôn ngữ đích:</label>
+                    <select class="form-select" name="target_lang">
+                        <option value="vi">Tiếng Việt</option>
+                        <option value="en">Tiếng Anh</option>
+                        <option value="ko">Tiếng Hàn</option>
+                        <option value="ja">Tiếng Nhật</option>
+                    </select>
+                </div>
+
+                <!-- Thêm vào trong form, sau phần language options -->
+                <div class="row mb-3">
+                    <div class="col">
+                        <label class="form-label">Phong cách:</label>
+                        <select class="form-select" name="tone">
+                            <option value="standard" selected>Trung tính</option>
+                            <option value="casual">Thân mật</option>
+                            <option value="formal">Trang trọng</option>
+                            <option value="humorous">Hài hước</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label class="form-label">Đối tượng:</label>
+                        <select class="form-select" name="audience">
+                            <option value="general" selected>Phổ thông</option>
+                            <option value="youth">Giới trẻ</option>
+                            <option value="professional">Chuyên môn</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Mức độ sáng tạo: <span id="creativityValue">0.1</span></label>
+                    <input type="range" class="form-range" name="creativity" 
+                           min="0.1" max="1.0" step="0.1" value="0.1"
+                           oninput="document.getElementById('creativityValue').textContent=this.value">
+                </div>
+
+                <!-- Thêm vào phần style options -->
+                <div class="mb-3">
+                    <div class="subtitle-options">
+                        <label class="form-label">Tùy chọn phụ đề:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="auto_split" id="autoSplit">
+                            <label class="form-check-label" for="autoSplit">
+                                Tự động tách phụ đề dài
+                            </label>
+                        </div>
+                        <div class="input-group mt-2" id="splitSettingsGroup" style="display: none;">
+                            <label class="input-group-text">Độ dài tối đa:</label>
+                            <input type="number" class="form-control" name="max_length" 
+                                   value="45" min="20" max="100">
+                            <span class="input-group-text">ký tự</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thêm vào trong form, sau phần style options -->
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="use_cache" id="useCache">
+                        <label class="form-check-label" for="useCache">
+                            Sử dụng bản dịch đã lưu (nếu có)
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        Bắt đầu dịch
+                    </button>
+                    <button type="button" class="btn btn-warning" id="pauseBtn">
+                        Tạm dừng
+                    </button>
+                </div>
+            </form>
+
+            <!-- Progress -->
+            <div class="progress mt-3 hidden">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar">
+                    <span class="progress-text">0%</span>
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div id="status" class="alert mt-3 hidden"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Script hiện tại của index.html -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function() {
+        let isPaused = false;
+        let currentTask = null;
+        let isCheckingProgress = false;
+
+        // Xử lý nút tạm dừng
+        $('#pauseBtn').click(function() {
+            isPaused = !isPaused;
+            $(this).text(isPaused ? 'Tiếp tục' : 'Tạm dừng');
+            
+            if (currentTask) {
+                $.post('/toggle_pause', {
+                    task_id: currentTask,
+                    is_paused: isPaused
+                });
+            }
+        });
+
+        $('input[name="inputType"]').change(function() {
+            if (this.value === 'file') {
+                $('#fileInputSection').show();
+                $('#textInputSection').hide();
+                $('input[name="file"]').prop('required', true);
+                $('textarea[name="sourceText"]').prop('required', false);
+            } else {
+                $('#fileInputSection').hide();
+                $('#textInputSection').show();
+                $('input[name="file"]').prop('required', false);
+                $('textarea[name="sourceText"]').prop('required', true);
+            }
+        });
+
+        // Sửa đổi hàm submit form
+        $('#translateForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            $('.progress').show();
+            $('#pauseBtn').show();
+            $('#status').hide();
+            $('#submitBtn').prop('disabled', true);
+
+            var formData = new FormData(this);
+            var inputType = $('input[name="inputType"]:checked').val();
+
+            // Thay thế phần xử lý dịch văn bản trong $('#translateForm').submit
+            if (inputType === 'text') {
+                $.ajax({
+                    url: '/translate_text',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        currentTask = response.task_id;
+                        checkProgress(response.task_id);
+                    },
+                    error: function(xhr) {
+                        showMessage('danger', xhr.responseJSON?.error || 'Lỗi không xác định');
+                        $('#submitBtn').prop('disabled', false);
+                    }
+                });
+            } else {
+                // Xử lý dịch file như cũ
+                $.ajax({
+                    url: '/translate',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        checkProgress(response.task_id);
+                    },
+                    error: function(xhr) {
+                        showMessage('danger', xhr.responseJSON?.error || 'Lỗi không xác định');
+                    }
+                });
+            }
+        });
+
+        // Cập nhật hàm checkProgress để hỗ trợ cả file và text
+        function checkProgress(taskId) {
+            if (!taskId) return;
+            
+            $.get(`/progress/${taskId}`, function(data) {
+                // Cập nhật thanh tiến độ
+                $('.progress').show();
+                $('.progress-bar')
+                    .css('width', `${data.progress}%`)
+                    .find('.progress-text')
+                    .text(`${data.progress}%`);
+
+                // Xác định loại dịch
+                const isTextTranslation = $('input[name="inputType"]:checked').val() === 'text';
+
+                if (isTextTranslation) {
+                    // Luôn cập nhật textarea nếu có translated_text
+                    if (data.translated_text !== undefined) {
+                        $('#translatedText').val(data.translated_text);
+                    }
+                }
+
+                // Hiển thị thông tin tiến độ
+                let statusText = isTextTranslation 
+                    ? `Đang xử lý văn bản...` 
+                    : `Đang xử lý: ${data.current_sub || 0}/${data.total_subs || 0} phụ đề`;
+                $('#status').html(statusText).show();
+
+                // Xử lý trạng thái
+                if (data.status === 'completed') {
+                    if (isTextTranslation) {
+                        showMessage('success', 'Dịch hoàn thành!');
+                    } else {
+                        showMessage('success', 'Dịch hoàn thành! Đang tải file...');
+                        window.location.href = `/download/${taskId}`;
+                    }
+                    $('#submitBtn').prop('disabled', false);
+                } else if (data.status === 'failed') {
+                    showMessage('danger', `Lỗi: ${data.error}`);
+                    $('#submitBtn').prop('disabled', false);
+                } else {
+                    // Tiếp tục kiểm tra nếu chưa hoàn thành
+                    setTimeout(() => checkProgress(taskId), 500);
+                }
+            }).fail(function(xhr) {
+                showMessage('danger', 'Lỗi kết nối máy chủ');
+                $('#submitBtn').prop('disabled', false);
+            });
+        }
+
+        // Thêm style cho alert warning
+        function showMessage(type, message) {
+            const alertDiv = $('#status');
+            alertDiv
+                .removeClass('alert-success alert-danger alert-warning')
+                .addClass(`alert-${type}`)
+                .html(message)
+                .fadeIn();
+            
+            // Thêm animation cho thông báo rate limit
+            if (type === 'warning') {
+                alertDiv.css('animation', 'pulse 2s infinite');
+            } else {
+                alertDiv.css('animation', '');
+            }
+        }
+
+        // Thêm vào phần JavaScript
+        $('#autoSplit').change(function() {
+            $('#splitSettingsGroup').toggle(this.checked);
+        });
+
+        // Thêm vào phần JavaScript
+        function updateTranslatedText(text) {
+            const textarea = $('#translatedText');
+            if (textarea.length) {
+                textarea.val(text);
+                // Tự động scroll xuống cuối
+                textarea.scrollTop(textarea[0].scrollHeight);
+            }
+        }
+    });
+</script>
+{% endblock %}
